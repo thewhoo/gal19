@@ -158,10 +158,13 @@ void printShortestPaths(const std::vector<Path> &shortestPaths, const graph_t &g
 {
     for(const auto &path : shortestPaths) {
         std::cout << "Cost: " << path.cost << "\tPath: ";
+        int loopIndex = 0; // To check for last vertex in path (cannot check by value in case of loopy paths)
         for(const auto &vertexIndex : path.vertices) {
             std::cout << graph[vertexIndex].name;
-            if(vertexIndex != path.vertices.back())
+            if(loopIndex != path.vertices.size() - 1)
                 std::cout << " -> ";
+
+            loopIndex++;
         }
         std::cout << std::endl;
     }
