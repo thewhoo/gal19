@@ -1,0 +1,32 @@
+digraph G {
+a;
+b;
+c;
+d;
+a->b  [weight=10];
+a->d  [weight=46];
+b->a  [weight=5];
+b->c  [weight=1];
+b->d  [weight=3];
+c->d  [weight=1];
+}
+Cost: 12	Path: a -> b -> c -> d
+Cost: 13	Path: a -> b -> d
+Cost: 27	Path: a -> b -> a -> b -> c -> d
+Cost: 28	Path: a -> b -> a -> b -> d
+Cost: 42	Path: a -> b -> a -> b -> a -> b -> c -> d
+Cost: 43	Path: a -> b -> a -> b -> a -> b -> d
+Cost: 46	Path: a -> d
+Cost: 57	Path: a -> b -> a -> b -> a -> b -> a -> b -> c -> d
+Cost: 58	Path: a -> b -> a -> b -> a -> b -> a -> b -> d
+Cost: 61	Path: a -> b -> a -> d
+Cost: 72	Path: a -> b -> a -> b -> a -> b -> a -> b -> a -> b -> c -> d
+Cost: 73	Path: a -> b -> a -> b -> a -> b -> a -> b -> a -> b -> d
+Cost: 76	Path: a -> b -> a -> b -> a -> d
+Cost: 87	Path: a -> b -> a -> b -> a -> b -> a -> b -> a -> b -> a -> b -> c -> d
+Cost: 88	Path: a -> b -> a -> b -> a -> b -> a -> b -> a -> b -> a -> b -> d
+Cost: 91	Path: a -> b -> a -> b -> a -> b -> a -> d
+Cost: 102	Path: a -> b -> a -> b -> a -> b -> a -> b -> a -> b -> a -> b -> a -> b -> c -> d
+Cost: 103	Path: a -> b -> a -> b -> a -> b -> a -> b -> a -> b -> a -> b -> a -> b -> d
+Cost: 106	Path: a -> b -> a -> b -> a -> b -> a -> b -> a -> d
+Cost: 117	Path: a -> b -> a -> b -> a -> b -> a -> b -> a -> b -> a -> b -> a -> b -> a -> b -> c -> d

@@ -1,0 +1,12 @@
+digraph {
+a;
+b;
+c;
+d;
+a -> b [weight=10];
+b -> a [weight=5];
+b -> c [weight=1];
+c -> d [weight=1];
+b -> d [weight=3];
+a -> d [weight=46];
+}
