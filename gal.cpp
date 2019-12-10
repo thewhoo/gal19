@@ -34,6 +34,7 @@ typedef adjacency_list<vecS, vecS, directedS, Vertex, Edge> graph_t;
 graph_t getGraph(const std::string &filename);
 bool getStartAndEndNodeIndexes(const graph_t &graph, const std::string &startNode, const std::string &endNode, int &startNodeIndex, int &endNodeIndex);
 void findShortestPaths(const graph_t &graph, int startVertexIndex, int endVertexIndex, int pathCount, std::vector<Path> &shortestPaths);
+void findShortestPathsLoopless(const graph_t &graph, int startVertexIndex, int endVertexIndex, int pathCount, std::vector<Path> &shortestPaths);
 void printShortestPaths(const std::vector<Path> &shortestPaths, const graph_t &graph);
 
 int main(int argc, char *argv[]) {
@@ -66,6 +67,10 @@ int main(int argc, char *argv[]) {
     std::vector<Path> shortestPaths;
     findShortestPaths(graph, startNodeIndex, endNodeIndex, pathCount, shortestPaths);
     printShortestPaths(shortestPaths, graph);
+
+    //findShortestPathsLoopless(graph, startNodeIndex, endNodeIndex, pathCount, shortestPaths);
+    //std::cout << std::endl << "Loopless:" << std::endl;
+    //printShortestPaths(shortestPaths, graph);
 }
 
 graph_t getGraph(const std::string &filename)
@@ -151,6 +156,71 @@ void findShortestPaths(const graph_t &graph, int startVertexIndex, int endVertex
                 pathQueue.push(newPath);
             }
         }
+    }
+}
+
+void findShortestPathsLoopless(const graph_t &graph, int startVertexIndex, int endVertexIndex, int pathCount, std::vector<Path> &shortestPaths)
+{
+    shortestPaths.clear();
+
+    // Priority queue of candidate best paths
+    std::priority_queue<Path, std::vector<Path>, std::greater<>> candidateQueue;
+
+    // Get initial shortest path from start to end
+    findShortestPaths(graph, startVertexIndex, endVertexIndex, 1, shortestPaths);
+    if(shortestPaths.empty())
+        return;
+
+    for(int i = 1; i < pathCount; i++) {
+        const auto &previousPath = shortestPaths[i - 1];
+        // Spur node from first node to next-to-last node in previous path
+        for(int j = 0; j < previousPath.vertices.size() - 2; j++) {
+
+            auto rootPathVertices = previousPath.vertices;
+            // Get subpath of previous shortest path from root node to current spur node
+            auto spurNode = rootPathVertices[j];
+            rootPathVertices.erase(rootPathVertices.begin()+j+1, rootPathVertices.end());
+
+            // Copy of graph should be O(n)
+            auto graphCopy = graph;
+
+            // Disconnect all previous shortest paths that share the same root path
+            for(const auto &path : shortestPaths) {
+                auto currentSubpath = path.vertices;
+                currentSubpath.erase(currentSubpath.begin()+j+1, currentSubpath.end());
+                if(currentSubpath == rootPathVertices) {
+                    remove_edge(j, j+1, graphCopy);
+                }
+            }
+
+            // Remove disconnected nodes
+            //for(const auto &vertex : rootPathVertices) {
+            //    if(vertex != spurNode) {
+            //        remove_vertex(vertex, graphCopy);
+            //    }
+            //}
+
+            std::vector<Path> spurPathVec;
+            findShortestPaths(graphCopy, spurNode, endVertexIndex, 1, spurPathVec);
+            auto spurPath = spurPathVec.front();
+            // TODO path cost concatenation : will have to update Path struct
+            for(const auto &vertex : spurPath.vertices) {
+                rootPathVertices.push_back(vertex);
+            }
+
+            Path p;
+            p.vertices = std::move(rootPathVertices);
+            // FIXME
+            p.cost = spurPath.cost;
+
+            candidateQueue.push(std::move(p));
+        }
+
+        if(candidateQueue.empty())
+            break;
+
+        shortestPaths.push_back(candidateQueue.top());
+        candidateQueue.pop();
     }
 }
 
