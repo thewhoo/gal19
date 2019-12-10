@@ -1,3 +1,6 @@
+#include <vector>
+#include <queue>
+
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/graphviz.hpp>
 #include <boost/property_map/dynamic_property_map.hpp>
@@ -13,17 +16,33 @@ struct Edge {
     double weight;
 };
 
+struct Path {
+    std::vector<int> vertices;
+    double cost;
+
+    Path() : cost{0.0} {}
+};
+
+// Define comparison operators for Path
+bool operator >(const Path &p1, const Path &p2)
+{
+    return (p1.cost > p2.cost);
+}
+
 typedef adjacency_list<vecS, vecS, directedS, Vertex, Edge> graph_t;
 
 graph_t getGraph(const std::string &filename);
 bool getStartAndEndNodeIndexes(const graph_t &graph, const std::string &startNode, const std::string &endNode, int &startNodeIndex, int &endNodeIndex);
+void findShortestPaths(const graph_t &graph, int startVertexIndex, int endVertexIndex, int pathCount, std::vector<Path> &shortestPaths);
+void printShortestPaths(const std::vector<Path> &shortestPaths, const graph_t &graph);
 
 int main(int argc, char *argv[]) {
     std::string filename, startNode, endNode;
     int startNodeIndex{};
     int endNodeIndex{};
+    int pathCount;
 
-    if(argc != 4)
+    if(argc != 5)
     {
         std::cerr << "Wrong number of arguments" << std::endl;
         exit(EXIT_FAILURE);
@@ -34,15 +53,19 @@ int main(int argc, char *argv[]) {
     filename = argv[1];
     startNode = argv[2];
     endNode = argv[3];
+    pathCount = std::stoi(argv[4]);
+
 
     graph = getGraph(filename);
     if(!getStartAndEndNodeIndexes(graph, startNode, endNode, startNodeIndex, endNodeIndex))
     {
-        std::cerr << "Start or end node is not graph" << std::endl;
+        std::cerr << "Start or end node is not in graph" << std::endl;
+        exit(EXIT_FAILURE);
     }
-    
-    std::cout << "start node " << startNodeIndex << " end node " << endNodeIndex << std::endl;
 
+    std::vector<Path> shortestPaths;
+    findShortestPaths(graph, startNodeIndex, endNodeIndex, pathCount, shortestPaths);
+    printShortestPaths(shortestPaths, graph);
 }
 
 graph_t getGraph(const std::string &filename)
@@ -92,4 +115,54 @@ bool getStartAndEndNodeIndexes(const graph_t &graph, const std::string &startNod
     }
 
     return (startNodeFound && endNodeFound);
+}
+
+void findShortestPaths(const graph_t &graph, int startVertexIndex, int endVertexIndex, int pathCount, std::vector<Path> &shortestPaths)
+{
+    // Allocate shortest path priority queue
+    std::priority_queue<Path, std::vector<Path>, std::greater<>> pathQueue;
+    // Allocate per-node path count vector
+    std::vector<int> pathCounts(graph.m_vertices.size(), 0);
+
+    shortestPaths.clear();
+
+    // Insert initial path
+    auto initialPath = Path{};
+    initialPath.vertices.push_back(startVertexIndex);
+    pathQueue.push(initialPath);
+
+    while(!pathQueue.empty() && pathCounts[endVertexIndex] < pathCount) {
+        Path currentShortestPath{pathQueue.top()};
+        pathQueue.pop();
+
+        auto pathEndVertex = currentShortestPath.vertices.back();
+        pathCounts[pathEndVertex]++;
+
+        if(pathEndVertex == endVertexIndex) {
+            shortestPaths.push_back(currentShortestPath);
+        }
+
+        if(pathCounts[pathEndVertex] <= pathCount) {
+            for(const auto &edge : graph.out_edge_list(pathEndVertex)) {
+                auto targetIndex = edge.m_target;
+                auto &&newPath = Path(currentShortestPath);
+                newPath.vertices.push_back(targetIndex);
+                newPath.cost += edge.get_property().weight;
+                pathQueue.push(newPath);
+            }
+        }
+    }
+}
+
+void printShortestPaths(const std::vector<Path> &shortestPaths, const graph_t &graph)
+{
+    for(const auto &path : shortestPaths) {
+        std::cout << "Cost: " << path.cost << "\tPath: ";
+        for(const auto &vertexIndex : path.vertices) {
+            std::cout << graph[vertexIndex].name;
+            if(vertexIndex != path.vertices.back())
+                std::cout << " -> ";
+        }
+        std::cout << std::endl;
+    }
 }
