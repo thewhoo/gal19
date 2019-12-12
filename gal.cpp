@@ -6,7 +6,6 @@
 
 #include <omp.h>
 
-#include <boost/iterator/zip_iterator.hpp>
 #include <boost/range.hpp>
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/graphviz.hpp>
@@ -73,8 +72,8 @@ int main(int argc, char *argv[]) {
     int endNodeIndex{};
     int pathCount;
 
-    if (argc != 5) {
-        std::cerr << "Wrong number of arguments" << std::endl;
+    if (argc != 6) {
+        std::cerr << "./gal19 filename start_node end_node path_count parallel_threads" << std::endl;
         exit(EXIT_FAILURE);
     }
 
@@ -84,7 +83,7 @@ int main(int argc, char *argv[]) {
     startNode = argv[2];
     endNode = argv[3];
     pathCount = std::stoi(argv[4]);
-
+    auto threadNum = std::stoi(argv[5]);
 
     graph = getGraph(filename);
     if (!getStartAndEndNodeIndexes(graph, startNode, endNode, startNodeIndex, endNodeIndex)) {
@@ -92,35 +91,26 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    std::vector<Path> shortestPaths;
-    auto start = std::chrono::high_resolution_clock::now();
-    findShortestPaths(graph, startNodeIndex, endNodeIndex, pathCount, shortestPaths);
-    auto stop = std::chrono::high_resolution_clock::now();
-    printShortestPaths(shortestPaths, graph);
-    std::cout << std::endl << "Sequential runtime: "
-              << std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count() << std::endl;
+    if(threadNum > 0) {
+        omp_set_num_threads(threadNum);
 
-
-    std::priority_queue<Path, std::vector<Path>, std::greater<>> accumulatedShortestPaths;
-    start = std::chrono::high_resolution_clock::now();
-    findShortestPathsHighIQ(graph, startNodeIndex, endNodeIndex, pathCount, accumulatedShortestPaths);
-    stop = std::chrono::high_resolution_clock::now();
-    std::cout << std::endl << "Parallel:" << std::endl;
-    printPathQueue(accumulatedShortestPaths, graph, pathCount);
-    std::cout << std::endl << "Parallel runtime: "
-              << std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count() << std::endl;
-
-    //start = std::chrono::high_resolution_clock::now();
-    //findShortestPathsParallel(graph, startNodeIndex, endNodeIndex, pathCount, shortestPaths);
-    //stop = std::chrono::high_resolution_clock::now();
-    //std::cout << std::endl << "Parallel:" << std::endl;
-    //printShortestPaths(shortestPaths, graph, pathCount);
-    //std::cout << std::endl << "Parallel runtime: "
-    //          << std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count() << std::endl;
-
-    //findShortestPathsLoopless(graph, startNodeIndex, endNodeIndex, pathCount, shortestPaths);
-    //std::cout << std::endl << "Loopless:" << std::endl;
-    //printShortestPaths(shortestPaths, graph);
+        std::priority_queue<Path, std::vector<Path>, std::greater<>> accumulatedShortestPaths;
+        auto start = std::chrono::high_resolution_clock::now();
+        findShortestPathsHighIQ(graph, startNodeIndex, endNodeIndex, pathCount, accumulatedShortestPaths);
+        auto stop = std::chrono::high_resolution_clock::now();
+        printPathQueue(accumulatedShortestPaths, graph, pathCount);
+        std::cout << std::endl << "Runtime: "
+                  << std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count() << " usec" << std::endl;
+    }
+    else {
+        std::vector<Path> shortestPaths;
+        auto start = std::chrono::high_resolution_clock::now();
+        findShortestPaths(graph, startNodeIndex, endNodeIndex, pathCount, shortestPaths);
+        auto stop = std::chrono::high_resolution_clock::now();
+        printShortestPaths(shortestPaths, graph);
+        std::cout << std::endl << "Runtime: "
+                  << std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count() << " usec" << std::endl;
+    }
 }
 
 graph_t getGraph(const std::string &filename) {
