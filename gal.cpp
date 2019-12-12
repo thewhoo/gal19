@@ -2,6 +2,8 @@
 #include <queue>
 #include <numeric>
 #include <functional>
+#include <chrono>
+
 #include <omp.h>
 
 #include <boost/iterator/zip_iterator.hpp>
@@ -54,8 +56,16 @@ void findShortestPathsLoopless(const graph_t &graph, int startVertexIndex, int e
 
 void printShortestPaths(const std::vector<Path> &shortestPaths, const graph_t &graph);
 
+void printPathQueue(std::priority_queue<Path, std::vector<Path>, std::greater<>> q, const graph_t &graph, int pathCount);
+
 void findShortestPathsParallel(const graph_t &graph, int startVertexIndex, int endVertexIndex, int pathCount,
                                std::vector<Path> &shortestPaths);
+
+void findShortestPathsHighIQ(const graph_t &graph, int startVertexIndex, int endVertexIndex, int pathCount,
+                             std::priority_queue<Path, std::vector<Path>, std::greater<>> &accumulatedShortestPaths);
+
+template<class T>
+void fastInsert(std::deque<T> &q, T &&item);
 
 int main(int argc, char *argv[]) {
     std::string filename, startNode, endNode;
@@ -83,12 +93,30 @@ int main(int argc, char *argv[]) {
     }
 
     std::vector<Path> shortestPaths;
+    auto start = std::chrono::high_resolution_clock::now();
     findShortestPaths(graph, startNodeIndex, endNodeIndex, pathCount, shortestPaths);
+    auto stop = std::chrono::high_resolution_clock::now();
     printShortestPaths(shortestPaths, graph);
+    std::cout << std::endl << "Sequential runtime: "
+              << std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count() << std::endl;
 
-    findShortestPathsParallel(graph, startNodeIndex, endNodeIndex, pathCount, shortestPaths);
+
+    std::priority_queue<Path, std::vector<Path>, std::greater<>> accumulatedShortestPaths;
+    start = std::chrono::high_resolution_clock::now();
+    findShortestPathsHighIQ(graph, startNodeIndex, endNodeIndex, pathCount, accumulatedShortestPaths);
+    stop = std::chrono::high_resolution_clock::now();
     std::cout << std::endl << "Parallel:" << std::endl;
-    printShortestPaths(shortestPaths, graph);
+    printPathQueue(accumulatedShortestPaths, graph, pathCount);
+    std::cout << std::endl << "Parallel runtime: "
+              << std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count() << std::endl;
+
+    //start = std::chrono::high_resolution_clock::now();
+    //findShortestPathsParallel(graph, startNodeIndex, endNodeIndex, pathCount, shortestPaths);
+    //stop = std::chrono::high_resolution_clock::now();
+    //std::cout << std::endl << "Parallel:" << std::endl;
+    //printShortestPaths(shortestPaths, graph, pathCount);
+    //std::cout << std::endl << "Parallel runtime: "
+    //          << std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count() << std::endl;
 
     //findShortestPathsLoopless(graph, startNodeIndex, endNodeIndex, pathCount, shortestPaths);
     //std::cout << std::endl << "Loopless:" << std::endl;
@@ -141,6 +169,7 @@ void findShortestPaths(const graph_t &graph, int startVertexIndex, int endVertex
                        std::vector<Path> &shortestPaths) {
     // Allocate shortest path priority queue
     std::priority_queue<Path, std::vector<Path>, std::greater<>> pathQueue;
+    //std::deque<Path> pathQueue;
     // Allocate per-node path count vector
     std::vector<int> pathCounts(graph.m_vertices.size(), 0);
 
@@ -151,10 +180,13 @@ void findShortestPaths(const graph_t &graph, int startVertexIndex, int endVertex
     initialPath.vertices.push_back(startVertexIndex);
     initialPath.costs.push_back(0.0);
     pathQueue.push(initialPath);
+    //pathQueue.push_back(initialPath);
 
     while (!pathQueue.empty() && pathCounts[endVertexIndex] < pathCount) {
         Path currentShortestPath{pathQueue.top()};
         pathQueue.pop();
+        //Path currentShortestPath{pathQueue[0]};
+        //pathQueue.erase(pathQueue.begin());
 
         auto pathEndVertex = currentShortestPath.vertices.back();
         pathCounts[pathEndVertex]++;
@@ -166,7 +198,52 @@ void findShortestPaths(const graph_t &graph, int startVertexIndex, int endVertex
         if (pathCounts[pathEndVertex] <= pathCount) {
             for (const auto &edge : graph.out_edge_list(pathEndVertex)) {
                 auto targetIndex = edge.m_target;
-                auto &&newPath = Path(currentShortestPath);
+                auto newPath = Path(currentShortestPath);
+                newPath.vertices.push_back(targetIndex);
+
+                auto edgeCost = edge.get_property().weight;
+                newPath.costs.push_back(edgeCost);
+                newPath.totalCost += edgeCost;
+
+                pathQueue.push(newPath);
+                //pathQueue.push_back(newPath);
+                //fastInsert(pathQueue, std::move(newPath));
+            }
+            //std::sort(pathQueue.begin(), pathQueue.end());
+        }
+    }
+}
+
+void findShortestPathsHighIQ(const graph_t &graph, int startVertexIndex, int endVertexIndex, int pathCount,
+                             std::priority_queue<Path, std::vector<Path>, std::greater<>> &accumulatedShortestPaths) {
+    auto threadCount = omp_get_max_threads();
+
+    // Allocate shortest path priority queue
+    std::priority_queue<Path, std::vector<Path>, std::greater<>> pathQueue;
+    // Allocate per-node path count vector
+    std::vector<int> pathCounts(graph.m_vertices.size(), 0);
+
+    // Insert initial path
+    auto initialPath = Path{};
+    initialPath.vertices.push_back(startVertexIndex);
+    initialPath.costs.push_back(0.0);
+    pathQueue.push(initialPath);
+
+    while (!pathQueue.empty() && pathCounts[endVertexIndex] < pathCount && pathQueue.size() < threadCount) {
+        Path currentShortestPath{pathQueue.top()};
+        pathQueue.pop();
+
+        auto pathEndVertex = currentShortestPath.vertices.back();
+        pathCounts[pathEndVertex]++;
+
+        if (pathEndVertex == endVertexIndex) {
+            accumulatedShortestPaths.push(currentShortestPath);
+        }
+
+        if (pathCounts[pathEndVertex] <= pathCount) {
+            for (const auto &edge : graph.out_edge_list(pathEndVertex)) {
+                auto targetIndex = edge.m_target;
+                auto newPath = Path(currentShortestPath);
                 newPath.vertices.push_back(targetIndex);
 
                 auto edgeCost = edge.get_property().weight;
@@ -177,13 +254,84 @@ void findShortestPaths(const graph_t &graph, int startVertexIndex, int endVertex
             }
         }
     }
+
+    std::vector<int> threadLastPathCosts(threadCount);
+    double sharedMaxCost = 0.0;
+    bool stop = false;
+#pragma omp parallel default(none) firstprivate(pathQueue, pathCounts) shared(stop, threadCount, sharedMaxCost, threadLastPathCosts, graph, startVertexIndex, endVertexIndex, pathCount, accumulatedShortestPaths)
+    {
+        auto threadId = omp_get_thread_num();
+        auto itemCount = pathQueue.size() / threadCount;
+        auto itemModulo = pathQueue.size() % threadCount;
+
+        auto removeCount = itemCount * threadId + std::min<int>(threadId, itemModulo);
+
+        for (int i = 0; i < removeCount; i++)
+            pathQueue.pop();
+
+        std::priority_queue<Path, std::vector<Path>, std::greater<>> localQueue;
+        itemCount = threadId < itemModulo ? itemCount + 1 : itemCount;
+        for (int i = 0; i < itemCount; i++) {
+            localQueue.push(pathQueue.top());
+            pathQueue.pop();
+        }
+
+        while (!localQueue.empty() && pathCounts[endVertexIndex] < pathCount && !stop) {
+            Path currentShortestPath{localQueue.top()};
+            localQueue.pop();
+
+            auto pathEndVertex = currentShortestPath.vertices.back();
+            pathCounts[pathEndVertex]++;
+
+            if (pathEndVertex == endVertexIndex) {
+#pragma omp critical
+                {
+                    threadLastPathCosts[threadId] = currentShortestPath.totalCost;
+                    if(currentShortestPath.totalCost > sharedMaxCost)
+                        sharedMaxCost = currentShortestPath.totalCost;
+                    accumulatedShortestPaths.push(currentShortestPath);
+                };
+            }
+
+            if (pathCounts[pathEndVertex] <= pathCount) {
+                for (const auto &edge : graph.out_edge_list(pathEndVertex)) {
+                    auto targetIndex = edge.m_target;
+                    auto newPath = Path(currentShortestPath);
+                    newPath.vertices.push_back(targetIndex);
+
+                    auto edgeCost = edge.get_property().weight;
+                    newPath.costs.push_back(edgeCost);
+                    newPath.totalCost += edgeCost;
+
+                    localQueue.push(newPath);
+                }
+            }
+
+#pragma omp master
+            {
+                bool allCostsGreater = true;
+                for(const auto &cost : threadLastPathCosts) {
+                    if(cost < sharedMaxCost) {
+                        allCostsGreater = false;
+                        break;
+                    }
+                }
+
+                if(allCostsGreater && accumulatedShortestPaths.size() >= pathCount)
+                    stop = true;
+            };
+        }
+    };
 }
 
 void findShortestPathsParallel(const graph_t &graph, int startVertexIndex, int endVertexIndex, int pathCount,
                                std::vector<Path> &shortestPaths) {
     auto threadCount = omp_get_max_threads();
     // Allocate shortest path priority queue
-    std::vector<Path> currentPaths;
+    //std::vector<Path> currentPaths;
+    //currentPaths.reserve(10000);
+    //std::priority_queue<Path, std::vector<Path>, std::greater<>> currentPaths;
+    std::deque<Path> currentPaths;
     std::vector<std::vector<Path>> prospectivePaths(threadCount);
     std::vector<double> prospectivePathMinCosts(threadCount);
     // Allocate per-node path count vector
@@ -195,7 +343,8 @@ void findShortestPathsParallel(const graph_t &graph, int startVertexIndex, int e
     auto initialPath = Path{};
     initialPath.vertices.push_back(startVertexIndex);
     initialPath.costs.push_back(0.0);
-    currentPaths.push_back(initialPath);
+    //currentPaths.push_back(initialPath);
+    currentPaths.push_front(initialPath);
 
     std::cout << "thr count: " << threadCount << std::endl;
 
@@ -237,9 +386,11 @@ void findShortestPathsParallel(const graph_t &graph, int startVertexIndex, int e
         {
             auto precalcResultCount = std::min<int>(threadCount, currentPaths.size());
             for (auto i = 0; i < precalcResultCount; i++) {
-                if (i == 0 || currentPaths[0].totalCost >= prospectivePathMinCosts[i]) {
-                    Path currentShortestPath{currentPaths.front()};
+                if (i == 0 || currentPaths[0].totalCost < prospectivePathMinCosts[i]) {
+                    //if(true) {
+                    Path currentShortestPath{currentPaths[0]};
                     currentPaths.erase(currentPaths.begin());
+                    //currentPaths.pop();
 
                     auto pathEndVertex = currentShortestPath.vertices.back();
                     pathCounts[pathEndVertex]++;
@@ -248,11 +399,17 @@ void findShortestPathsParallel(const graph_t &graph, int startVertexIndex, int e
                         shortestPaths.push_back(currentShortestPath);
                     }
 
-                    currentPaths.insert(currentPaths.end(), prospectivePaths[i].begin(), prospectivePaths[i].end());
-                    std::sort(currentPaths.begin(), currentPaths.end());
+                    //currentPaths.insert(currentPaths.end(), prospectivePaths[i].begin(), prospectivePaths[i].end());
+                    //std::sort(currentPaths.begin(), currentPaths.end());
+                    for (auto &p : prospectivePaths[i]) {
+                        //currentPaths.push_back(std::move(p));
+                        fastInsert(currentPaths, std::move(p));
+                    }
+                    //std::sort(currentPaths.begin(), currentPaths.end());
                 } else
                     break;
             }
+            //std::sort(currentPaths.begin(), currentPaths.end());
         };
     }
 }
@@ -344,7 +501,8 @@ void findShortestPathsLoopless(const graph_t &graph, int startVertexIndex, int e
     }
 }
 
-void printShortestPaths(const std::vector<Path> &shortestPaths, const graph_t &graph) {
+void printShortestPaths(const std::vector<Path> &shortestPaths, const graph_t &graph)
+{
     for (const auto &path : shortestPaths) {
         std::cout << "Cost: " << path.totalCost << "\tPath: ";
         int loopIndex = 0; // To check for last vertex in path (cannot check by value in case of loopy paths)
@@ -357,4 +515,35 @@ void printShortestPaths(const std::vector<Path> &shortestPaths, const graph_t &g
         }
         std::cout << std::endl;
     }
+}
+
+void printPathQueue(std::priority_queue<Path, std::vector<Path>, std::greater<>> q, const graph_t &graph, int pathCount)
+{
+    auto end = std::min<int>(q.size(), pathCount);
+    for (int i = 0; i < end; i++) {
+        auto path = q.top();
+        q.pop();
+        std::cout << "Cost: " << path.totalCost << "\tPath: ";
+        int loopIndex = 0; // To check for last vertex in path (cannot check by value in case of loopy paths)
+        for (const auto &vertexIndex : path.vertices) {
+            std::cout << graph[vertexIndex].name;
+            if (loopIndex != path.vertices.size() - 1)
+                std::cout << " -> ";
+
+            loopIndex++;
+        }
+        std::cout << std::endl;
+    }
+}
+
+template<class T>
+void fastInsert(std::deque<T> &q, T &&item) {
+    for (auto it = q.rbegin(); it != q.rend(); it++) {
+        if (item > *it) {
+            q.insert(it.base(), item);
+            return;
+        }
+    }
+
+    q.push_back(item);
 }
