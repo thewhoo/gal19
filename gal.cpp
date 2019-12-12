@@ -31,24 +31,31 @@ struct Path {
 };
 
 // Define comparison operators for Path
-bool operator >(const Path &p1, const Path &p2)
-{
+bool operator>(const Path &p1, const Path &p2) {
     return (p1.totalCost > p2.totalCost);
 }
 
-bool operator <(const Path &p1, const Path &p2)
-{
+bool operator<(const Path &p1, const Path &p2) {
     return (p1.totalCost < p2.totalCost);
 }
 
 typedef adjacency_list<vecS, vecS, directedS, Vertex, Edge> graph_t;
 
 graph_t getGraph(const std::string &filename);
-bool getStartAndEndNodeIndexes(const graph_t &graph, const std::string &startNode, const std::string &endNode, int &startNodeIndex, int &endNodeIndex);
-void findShortestPaths(const graph_t &graph, int startVertexIndex, int endVertexIndex, int pathCount, std::vector<Path> &shortestPaths);
-void findShortestPathsLoopless(const graph_t &graph, int startVertexIndex, int endVertexIndex, int pathCount, std::vector<Path> &shortestPaths);
+
+bool getStartAndEndNodeIndexes(const graph_t &graph, const std::string &startNode, const std::string &endNode,
+                               int &startNodeIndex, int &endNodeIndex);
+
+void findShortestPaths(const graph_t &graph, int startVertexIndex, int endVertexIndex, int pathCount,
+                       std::vector<Path> &shortestPaths);
+
+void findShortestPathsLoopless(const graph_t &graph, int startVertexIndex, int endVertexIndex, int pathCount,
+                               std::vector<Path> &shortestPaths);
+
 void printShortestPaths(const std::vector<Path> &shortestPaths, const graph_t &graph);
-void findShortestPathsParallel(const graph_t &graph, int startVertexIndex, int endVertexIndex, int pathCount, std::vector<Path> &shortestPaths);
+
+void findShortestPathsParallel(const graph_t &graph, int startVertexIndex, int endVertexIndex, int pathCount,
+                               std::vector<Path> &shortestPaths);
 
 int main(int argc, char *argv[]) {
     std::string filename, startNode, endNode;
@@ -56,8 +63,7 @@ int main(int argc, char *argv[]) {
     int endNodeIndex{};
     int pathCount;
 
-    if(argc != 5)
-    {
+    if (argc != 5) {
         std::cerr << "Wrong number of arguments" << std::endl;
         exit(EXIT_FAILURE);
     }
@@ -71,8 +77,7 @@ int main(int argc, char *argv[]) {
 
 
     graph = getGraph(filename);
-    if(!getStartAndEndNodeIndexes(graph, startNode, endNode, startNodeIndex, endNodeIndex))
-    {
+    if (!getStartAndEndNodeIndexes(graph, startNode, endNode, startNodeIndex, endNodeIndex)) {
         std::cerr << "Start or end node is not in graph" << std::endl;
         exit(EXIT_FAILURE);
     }
@@ -90,8 +95,7 @@ int main(int argc, char *argv[]) {
     //printShortestPaths(shortestPaths, graph);
 }
 
-graph_t getGraph(const std::string &filename)
-{
+graph_t getGraph(const std::string &filename) {
     // Construct an empty graph and prepare the dynamic_property_maps.
     graph_t graph(0);
 
@@ -101,8 +105,7 @@ graph_t getGraph(const std::string &filename)
 
     std::ifstream dot(filename);
 
-    if(!read_graphviz(dot, graph, dp)) 
-    {
+    if (!read_graphviz(dot, graph, dp)) {
         std::cerr << "Can't read input graph" << std::endl;
         exit(EXIT_FAILURE);
     }
@@ -112,26 +115,21 @@ graph_t getGraph(const std::string &filename)
     return graph;
 }
 
-bool getStartAndEndNodeIndexes(const graph_t &graph, const std::string &startNode, const std::string &endNode, int &startNodeIndex, int &endNodeIndex)
-{
+bool getStartAndEndNodeIndexes(const graph_t &graph, const std::string &startNode, const std::string &endNode,
+                               int &startNodeIndex, int &endNodeIndex) {
     int index = 0;
     bool startNodeFound, endNodeFound;
     startNodeFound = endNodeFound = false;
-    for(const auto &vertex : graph.m_vertices)
-    {
-        if(vertex.m_property.name == startNode)
-        {
+    for (const auto &vertex : graph.m_vertices) {
+        if (vertex.m_property.name == startNode) {
             startNodeIndex = index;
             startNodeFound = true;
-        }
-        else if(vertex.m_property.name == endNode)
-        {
+        } else if (vertex.m_property.name == endNode) {
             endNodeIndex = index;
             endNodeFound = true;
         }
         index++;
-        if(startNodeFound && endNodeFound)
-        {
+        if (startNodeFound && endNodeFound) {
             break;
         }
     }
@@ -139,8 +137,8 @@ bool getStartAndEndNodeIndexes(const graph_t &graph, const std::string &startNod
     return (startNodeFound && endNodeFound);
 }
 
-void findShortestPaths(const graph_t &graph, int startVertexIndex, int endVertexIndex, int pathCount, std::vector<Path> &shortestPaths)
-{
+void findShortestPaths(const graph_t &graph, int startVertexIndex, int endVertexIndex, int pathCount,
+                       std::vector<Path> &shortestPaths) {
     // Allocate shortest path priority queue
     std::priority_queue<Path, std::vector<Path>, std::greater<>> pathQueue;
     // Allocate per-node path count vector
@@ -154,19 +152,19 @@ void findShortestPaths(const graph_t &graph, int startVertexIndex, int endVertex
     initialPath.costs.push_back(0.0);
     pathQueue.push(initialPath);
 
-    while(!pathQueue.empty() && pathCounts[endVertexIndex] < pathCount) {
+    while (!pathQueue.empty() && pathCounts[endVertexIndex] < pathCount) {
         Path currentShortestPath{pathQueue.top()};
         pathQueue.pop();
 
         auto pathEndVertex = currentShortestPath.vertices.back();
         pathCounts[pathEndVertex]++;
 
-        if(pathEndVertex == endVertexIndex) {
+        if (pathEndVertex == endVertexIndex) {
             shortestPaths.push_back(currentShortestPath);
         }
 
-        if(pathCounts[pathEndVertex] <= pathCount) {
-            for(const auto &edge : graph.out_edge_list(pathEndVertex)) {
+        if (pathCounts[pathEndVertex] <= pathCount) {
+            for (const auto &edge : graph.out_edge_list(pathEndVertex)) {
                 auto targetIndex = edge.m_target;
                 auto &&newPath = Path(currentShortestPath);
                 newPath.vertices.push_back(targetIndex);
@@ -181,10 +179,9 @@ void findShortestPaths(const graph_t &graph, int startVertexIndex, int endVertex
     }
 }
 
-void findShortestPathsParallel(const graph_t &graph, int startVertexIndex, int endVertexIndex, int pathCount, std::vector<Path> &shortestPaths)
-{
-    omp_set_num_threads(8);
-    auto threadCount = omp_get_num_threads();
+void findShortestPathsParallel(const graph_t &graph, int startVertexIndex, int endVertexIndex, int pathCount,
+                               std::vector<Path> &shortestPaths) {
+    auto threadCount = omp_get_max_threads();
     // Allocate shortest path priority queue
     std::vector<Path> currentPaths;
     std::vector<std::vector<Path>> prospectivePaths(threadCount);
@@ -202,65 +199,66 @@ void findShortestPathsParallel(const graph_t &graph, int startVertexIndex, int e
 
     std::cout << "thr count: " << threadCount << std::endl;
 
-    while(!currentPaths.empty() && pathCounts[endVertexIndex] < pathCount) {
+#pragma omp parallel default(none) shared(graph, currentPaths, pathCounts, endVertexIndex, pathCount, prospectivePaths, prospectivePathMinCosts, shortestPaths, threadCount, std::cout)
+    while (!currentPaths.empty() && pathCounts[endVertexIndex] < pathCount) {
+        auto threadId = omp_get_thread_num();
 
-        #pragma omp parallel default(shared)
-        {
-            auto threadId = omp_get_thread_num();
+        if (threadId < currentPaths.size()) {
+            auto precalcPath = currentPaths[threadId];
+            auto pathEndVertex = precalcPath.vertices.back();
 
-            if(threadId < currentPaths.size()) {
-                auto precalcPath = currentPaths[threadId];
-                auto pathEndVertex = precalcPath.vertices.back();
+            std::vector<Path> generatedPaths;
+            double minCost = std::numeric_limits<double>::max();
+            if (pathCounts[pathEndVertex] <= pathCount) {
+                for (const auto &edge : graph.out_edge_list(pathEndVertex)) {
+                    auto targetIndex = edge.m_target;
+                    auto &&newPath = Path(precalcPath);
 
-                std::vector<Path> generatedPaths;
-                double minCost = std::numeric_limits<double>::max();
-                if(pathCounts[pathEndVertex] <= pathCount) {
-                    for(const auto &edge : graph.out_edge_list(pathEndVertex)) {
-                        auto targetIndex = edge.m_target;
-                        auto &&newPath = Path(precalcPath);
+                    newPath.vertices.push_back(targetIndex);
 
-                        newPath.vertices.push_back(targetIndex);
+                    auto edgeCost = edge.get_property().weight;
+                    newPath.costs.push_back(edgeCost);
+                    newPath.totalCost += edgeCost;
 
-                        auto edgeCost = edge.get_property().weight;
-                        newPath.costs.push_back(edgeCost);
-                        newPath.totalCost += edgeCost;
+                    if (newPath.totalCost < minCost)
+                        minCost = newPath.totalCost;
 
-                        if(newPath.totalCost < minCost)
-                            minCost = newPath.totalCost;
-
-                        generatedPaths.push_back(newPath);
-                    }
+                    generatedPaths.push_back(newPath);
                 }
+            }
 
-                prospectivePaths.emplace(prospectivePaths.begin() + threadId, std::move(generatedPaths));
-                prospectivePathMinCosts[threadId] = minCost;
+            //prospectivePaths.emplace(prospectivePaths.begin() + threadId, std::move(generatedPaths));
+            prospectivePaths[threadId] = std::move(generatedPaths);
+            prospectivePathMinCosts[threadId] = minCost;
+        }
+#pragma omp barrier
+
+#pragma omp single
+        {
+            auto precalcResultCount = std::min<int>(threadCount, currentPaths.size());
+            for (auto i = 0; i < precalcResultCount; i++) {
+                if (i == 0 || currentPaths[0].totalCost >= prospectivePathMinCosts[i]) {
+                    Path currentShortestPath{currentPaths.front()};
+                    currentPaths.erase(currentPaths.begin());
+
+                    auto pathEndVertex = currentShortestPath.vertices.back();
+                    pathCounts[pathEndVertex]++;
+
+                    if (pathEndVertex == endVertexIndex) {
+                        shortestPaths.push_back(currentShortestPath);
+                    }
+
+                    currentPaths.insert(currentPaths.end(), prospectivePaths[i].begin(), prospectivePaths[i].end());
+                    std::sort(currentPaths.begin(), currentPaths.end());
+                } else
+                    break;
             }
         };
-
-        auto precalcResultCount = std::min<int>(threadCount, currentPaths.size());
-        for(auto i = 0; i < precalcResultCount; i++) {
-            if(i == 0 || currentPaths[0].totalCost >= prospectivePathMinCosts[i]) {
-                Path currentShortestPath{currentPaths.front()};
-                currentPaths.erase(currentPaths.begin());
-
-                auto pathEndVertex = currentShortestPath.vertices.back();
-                pathCounts[pathEndVertex]++;
-
-                if(pathEndVertex == endVertexIndex) {
-                    shortestPaths.push_back(currentShortestPath);
-                }
-
-                currentPaths.insert(currentPaths.end(), prospectivePaths[i].begin(), prospectivePaths[i].end());
-                std::sort(currentPaths.begin(), currentPaths.end());
-            }
-            else
-                break;
-        }
     }
 }
 
-void findShortestPathsLoopless(const graph_t &graph, int startVertexIndex, int endVertexIndex, int pathCount, std::vector<Path> &shortestPaths)
-{
+void findShortestPathsLoopless(const graph_t &graph, int startVertexIndex, int endVertexIndex, int pathCount,
+                               std::vector<Path> &shortestPaths) {
     shortestPaths.clear();
 
     // Priority queue of candidate best paths
@@ -268,43 +266,44 @@ void findShortestPathsLoopless(const graph_t &graph, int startVertexIndex, int e
 
     // Get initial shortest path from start to end
     findShortestPaths(graph, startVertexIndex, endVertexIndex, 1, shortestPaths);
-    if(shortestPaths.empty())
+    if (shortestPaths.empty())
         return;
 
-    for(int i = 1; i < pathCount; i++) {
+    for (int i = 1; i < pathCount; i++) {
         //const auto &previousPath = shortestPaths[i - 1];
         const auto &previousPath = shortestPaths.back();
         // Spur node from first node to next-to-last node in previous path
-        for(int j = 0; j < previousPath.vertices.size() - 2; j++) {
+        for (int j = 0; j < previousPath.vertices.size() - 2; j++) {
 
             auto rootPath = previousPath;
             // Get subpath of previous shortest path from root node to current spur node
             auto spurNode = rootPath.vertices[j];
-            rootPath.vertices.erase(rootPath.vertices.begin()+j+1, rootPath.vertices.end());
-            rootPath.costs.erase(rootPath.costs.begin()+j+1, rootPath.costs.end());
+            rootPath.vertices.erase(rootPath.vertices.begin() + j + 1, rootPath.vertices.end());
+            rootPath.costs.erase(rootPath.costs.begin() + j + 1, rootPath.costs.end());
             // Recalculate subpath cost
             rootPath.totalCost = std::accumulate(rootPath.costs.begin(), rootPath.costs.end(), 0.0);
 
-            std::cout << "i = " << i << " j = " << j << " spur: " << spurNode << " nsp size: " << rootPath.vertices.size() << " new sp cost: " << rootPath.totalCost << std::endl;
+            std::cout << "i = " << i << " j = " << j << " spur: " << spurNode << " nsp size: "
+                      << rootPath.vertices.size() << " new sp cost: " << rootPath.totalCost << std::endl;
 
 
             // Copy of graph should be O(n)
             auto graphCopy = graph;
 
             // Disconnect all previous shortest paths that share the same root path
-            for(const auto &path : shortestPaths) {
+            for (const auto &path : shortestPaths) {
                 auto currentSubpath = path.vertices;
-                currentSubpath.erase(currentSubpath.begin()+j+1, currentSubpath.end());
-                if(currentSubpath == rootPath.vertices) {
-                    remove_edge(path.vertices[j], path.vertices[j+1], graphCopy);
+                currentSubpath.erase(currentSubpath.begin() + j + 1, currentSubpath.end());
+                if (currentSubpath == rootPath.vertices) {
+                    remove_edge(path.vertices[j], path.vertices[j + 1], graphCopy);
                 }
             }
 
             // Remove disconnected nodes
-            for(const auto &vertex : rootPath.vertices) {
-                if(vertex != spurNode) {
+            for (const auto &vertex : rootPath.vertices) {
+                if (vertex != spurNode) {
                     //remove_edge(graphCopy.out_edge_list(vertex), graphCopy);
-                    for(int v = 0; i < num_vertices(graphCopy); i++) {
+                    for (int v = 0; i < num_vertices(graphCopy); i++) {
                         remove_edge(vertex, v, graphCopy);
                         remove_edge(v, vertex, graphCopy);
                     }
@@ -326,7 +325,7 @@ void findShortestPathsLoopless(const graph_t &graph, int startVertexIndex, int e
 
             auto itVertices = spurPath.vertices.begin();
             auto itCosts = spurPath.costs.begin();
-            while(itVertices != spurPath.vertices.end() && itCosts != spurPath.costs.end()) {
+            while (itVertices != spurPath.vertices.end() && itCosts != spurPath.costs.end()) {
                 rootPath.vertices.push_back((*itVertices));
                 rootPath.costs.push_back(*itCosts);
                 itVertices++;
@@ -337,7 +336,7 @@ void findShortestPathsLoopless(const graph_t &graph, int startVertexIndex, int e
             candidateQueue.push(rootPath);
         }
 
-        if(candidateQueue.empty())
+        if (candidateQueue.empty())
             break;
 
         shortestPaths.push_back(candidateQueue.top());
@@ -345,14 +344,13 @@ void findShortestPathsLoopless(const graph_t &graph, int startVertexIndex, int e
     }
 }
 
-void printShortestPaths(const std::vector<Path> &shortestPaths, const graph_t &graph)
-{
-    for(const auto &path : shortestPaths) {
+void printShortestPaths(const std::vector<Path> &shortestPaths, const graph_t &graph) {
+    for (const auto &path : shortestPaths) {
         std::cout << "Cost: " << path.totalCost << "\tPath: ";
         int loopIndex = 0; // To check for last vertex in path (cannot check by value in case of loopy paths)
-        for(const auto &vertexIndex : path.vertices) {
+        for (const auto &vertexIndex : path.vertices) {
             std::cout << graph[vertexIndex].name;
-            if(loopIndex != path.vertices.size() - 1)
+            if (loopIndex != path.vertices.size() - 1)
                 std::cout << " -> ";
 
             loopIndex++;
