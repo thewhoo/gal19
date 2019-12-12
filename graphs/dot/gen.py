@@ -53,3 +53,20 @@ def dense_nosl_dyn_wt():
                     wt += 1
 
         f.write("}\n")
+
+
+def g4():
+    with open("g4.dot", "w") as f:
+        f.write("digraph {\n")
+        for c in ascii_lowercase:
+            f.write(f"{c};\n")
+        wt = 1
+        for c in ascii_lowercase:
+            for d in ascii_lowercase:
+                if c != d:
+                    f.write(f"{c} -> {d} [weight={wt}];\n")
+            wt += 1
+
+        f.write("}\n")
+
+g4()
