@@ -1,5 +1,6 @@
 import subprocess
 import difflib
+from collections import defaultdict
 
 files = ['g1_2', 'g1_4', 'g1_20', 'g1_4096', 'g2_1', 'g2_2', 'g2_3', 'g2_4', 'g2_4096', 'g3_27_w1_sl', 'g3_703_w1_sl', 'g3_4089_wd_nosl', 'g3_4394_wd_nosl_az']
 
@@ -117,24 +118,20 @@ tests = {
 
 graph_dir = 'graphs/dot'
 bin = './gal'
-for graph, cmds in tests.items():
-    outputs = []
-    for c in cmds:
-        outputs.append((str(subprocess.check_output(f"{bin} {graph_dir}/{graph[:-3]} {c}", shell=True), 'utf-8')).splitlines())
+times = defaultdict(list)
+for i in range(12):
+    for graph, cmds in tests.items():
+        outputs = []
+        for c in cmds:
+            outputs.append((str(subprocess.check_output(f"{bin} {graph_dir}/{graph[:-3]} {c}", shell=True), 'utf-8')).splitlines())
+        #print name
+        print(graph, cmds[0], '/', cmds[1])
+        #print("\tseq: " + outputs[0][-1])
+        #print("\tpar: " + outputs[1][-1])
+        times[graph[:-3] + "seq " + cmds[0][:-2]].append(outputs[0][-1])
+        times[graph[:-3] + "par(" + graph[-3]  + ") " + cmds[0][:-2]].append(outputs[0][-1])
 
-    #remove runtime
-    outputs[0] = outputs[0][:-1]
-    outputs[1] = outputs[1][:-1]
-
-    #sort list so paths can be compared
-    outputs[0].sort()
-    outputs[1].sort()
-    #create string from list for diff
-    outputs[0] = ''.join(outputs[0])
-    outputs[1] = ''.join(outputs[1])
-
-    #print name
-    print(graph, cmds[0], '/', cmds[1])
-
-    for line in difflib.unified_diff(''.join(outputs[0]), ''.join(outputs[1]), fromfile=cmds[0], tofile=cmds[1], lineterm=''):
-        print(line)
+for key, value in times.items():
+    print(key)
+    for time in value:
+        print("\t" + time)
