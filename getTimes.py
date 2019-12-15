@@ -119,7 +119,7 @@ tests = {
 graph_dir = 'graphs/dot'
 bin = './gal'
 times = defaultdict(list)
-for i in range(12):
+for i in range(3):
     for graph, cmds in tests.items():
         outputs = []
         for c in cmds:
@@ -129,7 +129,7 @@ for i in range(12):
         #print("\tseq: " + outputs[0][-1])
         #print("\tpar: " + outputs[1][-1])
         times[graph[:-3] + "seq " + cmds[0][:-2]].append(outputs[0][-1])
-        times[graph[:-3] + "par(" + graph[-3]  + ") " + cmds[0][:-2]].append(outputs[0][-1])
+        times[graph[:-3] + "par(" + graph[-3]  + ") " + cmds[0][:-2]].append(outputs[1][-1])
 
 for key, value in times.items():
     print(key)
