@@ -69,4 +69,33 @@ def g4():
 
         f.write("}\n")
 
-g4()
+
+def g5():
+    with open("g5.dot", "w") as f:
+        f.write("digraph {\n")
+        nodes=1024
+        for i in range(nodes):
+            f.write(f"node_{i};\n")
+        wt = 1
+        for i in range(nodes):
+            for j in range(nodes):
+                if i != j:
+                    f.write(f"node_{i} -> node_{j} [weight={wt}];\n")
+            wt += 1
+
+        f.write("}\n")
+
+
+def g6():
+    with open("g6.dot", "w") as f:
+        f.write("digraph {\n")
+        nodes=256
+        for i in range(nodes):
+            f.write(f"{i};\n")
+        for i in range(nodes):
+            for j in range(nodes):
+                if i != j:
+                    f.write(f"{i} -> {j} [weight=1];\n")
+
+        f.write("}\n")
+g6()
