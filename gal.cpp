@@ -253,7 +253,7 @@ void findShortestPathsHighIQ(const graph_t &graph, int startVertexIndex, int end
         }
     }
 
-    std::vector<int> threadLastPathCosts(threadCount);
+    std::vector<double> threadLastPathCosts(threadCount);
     double sharedMaxCost = 0.0;
     bool stop = false;
 #pragma omp parallel default(none) firstprivate(pathQueue, pathCounts) shared(stop, threadCount, sharedMaxCost, threadLastPathCosts, graph, startVertexIndex, endVertexIndex, pathCount, accumulatedShortestPaths)
