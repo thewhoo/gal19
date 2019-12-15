@@ -55,7 +55,8 @@ void findShortestPathsLoopless(const graph_t &graph, int startVertexIndex, int e
 
 void printShortestPaths(const std::vector<Path> &shortestPaths, const graph_t &graph);
 
-void printPathQueue(std::priority_queue<Path, std::vector<Path>, std::greater<>> q, const graph_t &graph, int pathCount);
+void
+printPathQueue(std::priority_queue<Path, std::vector<Path>, std::greater<>> q, const graph_t &graph, int pathCount);
 
 void findShortestPathsParallel(const graph_t &graph, int startVertexIndex, int endVertexIndex, int pathCount,
                                std::vector<Path> &shortestPaths);
@@ -73,7 +74,13 @@ int main(int argc, char *argv[]) {
     int pathCount;
 
     if (argc != 6) {
-        std::cerr << "./gal19 filename start_node end_node path_count parallel_threads" << std::endl;
+        std::cerr << "./gal19 graph start_node end_node path_count parallel_threads" << std::endl
+                  << "\tgraph - path to graph file in .dot format" << std::endl
+                  << "\tstart_node - identifier of start node" << std::endl
+                  << "\tend_node - identifier of end node" << std::endl
+                  << "\tpath_count - maximum number of shortest paths to find" << std::endl
+                  << "\tparallel_threads - number of parallel threads to run (0 will run the reference sequential version)"
+                  << std::endl;
         exit(EXIT_FAILURE);
     }
 
@@ -91,7 +98,7 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    if(threadNum > 0) {
+    if (threadNum > 0) {
         omp_set_num_threads(threadNum);
 
         std::priority_queue<Path, std::vector<Path>, std::greater<>> accumulatedShortestPaths;
@@ -100,16 +107,17 @@ int main(int argc, char *argv[]) {
         auto stop = std::chrono::high_resolution_clock::now();
         printPathQueue(accumulatedShortestPaths, graph, pathCount);
         std::cout << std::endl << "Runtime: "
-                  << std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count() << " usec" << std::endl;
-    }
-    else {
+                  << std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count() << " usec"
+                  << std::endl;
+    } else {
         std::vector<Path> shortestPaths;
         auto start = std::chrono::high_resolution_clock::now();
         findShortestPaths(graph, startNodeIndex, endNodeIndex, pathCount, shortestPaths);
         auto stop = std::chrono::high_resolution_clock::now();
         printShortestPaths(shortestPaths, graph);
         std::cout << std::endl << "Runtime: "
-                  << std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count() << " usec" << std::endl;
+                  << std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count() << " usec"
+                  << std::endl;
     }
 }
 
@@ -277,7 +285,7 @@ void findShortestPathsHighIQ(const graph_t &graph, int startVertexIndex, int end
 #pragma omp critical
                 {
                     threadLastPathCosts[threadId] = currentShortestPath.totalCost;
-                    if(currentShortestPath.totalCost > sharedMaxCost)
+                    if (currentShortestPath.totalCost > sharedMaxCost)
                         sharedMaxCost = currentShortestPath.totalCost;
                     accumulatedShortestPaths.push(currentShortestPath);
                 };
@@ -300,14 +308,14 @@ void findShortestPathsHighIQ(const graph_t &graph, int startVertexIndex, int end
 #pragma omp master
             {
                 bool allCostsGreater = true;
-                for(const auto &cost : threadLastPathCosts) {
-                    if(cost < sharedMaxCost) {
+                for (const auto &cost : threadLastPathCosts) {
+                    if (cost < sharedMaxCost) {
                         allCostsGreater = false;
                         break;
                     }
                 }
 
-                if(allCostsGreater && accumulatedShortestPaths.size() >= pathCount)
+                if (allCostsGreater && accumulatedShortestPaths.size() >= pathCount)
                     stop = true;
             };
         }
@@ -491,8 +499,7 @@ void findShortestPathsLoopless(const graph_t &graph, int startVertexIndex, int e
     }
 }
 
-void printShortestPaths(const std::vector<Path> &shortestPaths, const graph_t &graph)
-{
+void printShortestPaths(const std::vector<Path> &shortestPaths, const graph_t &graph) {
     for (const auto &path : shortestPaths) {
         std::cout << "Cost: " << path.totalCost << "\tPath: ";
         int loopIndex = 0; // To check for last vertex in path (cannot check by value in case of loopy paths)
@@ -507,8 +514,8 @@ void printShortestPaths(const std::vector<Path> &shortestPaths, const graph_t &g
     }
 }
 
-void printPathQueue(std::priority_queue<Path, std::vector<Path>, std::greater<>> q, const graph_t &graph, int pathCount)
-{
+void
+printPathQueue(std::priority_queue<Path, std::vector<Path>, std::greater<>> q, const graph_t &graph, int pathCount) {
     auto end = std::min<int>(q.size(), pathCount);
     for (int i = 0; i < end; i++) {
         auto path = q.top();
